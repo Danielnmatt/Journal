@@ -1,65 +1,132 @@
-import Image from "next/image";
+"use client";
+import React, { useState, useRef, useEffect } from "react";
+import { TextareaAutosize } from "@mui/material";
+import CustomCard from "./components/journalentry";
+import DateTimePicker from "./components/datetimepicker";
+
+type JournalEntry = {
+	date: string;
+	time: string;
+	content: string;
+};
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+	const textAreaRef = useRef<HTMLTextAreaElement>(null);
+	const [entries, setEntries] = useState<JournalEntry[]>([]);
+	const [isLoaded, setIsLoaded] = useState(false);
+
+	const [customDate, setCustomDate] = useState<Date | null>(null);
+	const [customTime, setCustomTime] = useState<Date | null>(null);
+
+	useEffect(() => {
+		const savedEntries = localStorage.getItem("journalEntries");
+		if (savedEntries) {
+			try {
+				setEntries(JSON.parse(savedEntries));
+			} catch (error) {
+				console.error("Failed to parse saved entries:", error);
+			}
+		}
+		setIsLoaded(true);
+	}, []);
+
+	useEffect(() => {
+		if (isLoaded) {
+			localStorage.setItem("journalEntries", JSON.stringify(entries));
+		}
+	}, [entries, isLoaded]);
+
+	const handleSubmit = () => {
+		const value = textAreaRef.current?.value;
+		if (!value) return;
+		
+		const now = new Date();
+		const usedDate = customDate || now;
+		const usedTime = customTime || now;
+
+		const entry: JournalEntry = {
+			date: usedDate.toLocaleDateString("en-US", {
+				year: "numeric",
+				month: "long",
+				day: "numeric",
+			}),
+			time: usedTime.toLocaleTimeString("en-US", {
+				hour: "numeric",
+				minute: "2-digit",
+				hour12: true,
+			}),
+			content: value,
+		};
+
+		setEntries([entry, ...entries]);
+		if (textAreaRef.current) {
+			textAreaRef.current.value = "";
+		}
+	};
+
+	const handleParentClick = (e: React.MouseEvent<HTMLDivElement>) => {
+		if (e.target === textAreaRef.current) {
+			return;
+		}
+		textAreaRef.current?.focus();
+		textAreaRef.current?.select();
+	};
+
+	const handleDeleteDate = (date: string) => {
+		setEntries(entries.filter((entry) => entry.date !== date));
+	};
+
+	const groupedEntries = entries.reduce((acc, entry) => {
+		if (!acc[entry.date]) {
+			acc[entry.date] = [];
+		}
+		acc[entry.date].push(entry);
+		return acc;
+	}, {} as Record<string, JournalEntry[]>);
+
+	return (
+		<div className="min-h-full w-full bg-background [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-accent-blue [&::-webkit-scrollbar-thumb]:rounded-full">
+			{/* Main */}
+			<div className="h-screen w-full flex items-center justify-center flex-col gap-4 pt-12">
+				<div className="relative w-8/12">
+					<div className="">
+						<DateTimePicker setCustomDate={setCustomDate} setCustomTime={setCustomTime}/>
+					</div>
+
+					<h1 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl">
+						Write Your Thoughts Today
+					</h1>
+				</div>
+				{/* Entry Submission textarea */}
+				<div
+					onClick={handleParentClick}
+					className="shadow-sm shadow-white min-h-[50%] max-h-[60%] h-6/12 w-8/12 rounded-2xl backdrop-blur-2xl overflow-hidden hover:cursor-text"
+				>
+					<TextareaAutosize
+						ref={textAreaRef}
+						placeholder="Today I feel..."
+						className="h-full w-full text-primary-text placeholder-secondary-text rounded-2xl p-2 resize-none outline-none overflow-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-accent-blue [&::-webkit-scrollbar-thumb]:rounded-full"
+						maxRows={20}
+						style={{ maxHeight: "100%" }}
+					/>
+				</div>
+				<button
+					onClick={handleSubmit}
+					className="text-primary-text font-medium transition duration-500 block p-2 rounded-md hover:bg-border hover:cursor-pointer"
+				>
+					Submit Entry
+				</button>
+			</div>
+			<div className="w-10/12 px-4 pb-8 space-y-4 justify-self-center">
+				{Object.entries(groupedEntries).map(([date, dayEntries]) => (
+					<CustomCard
+						key={date}
+						date={date}
+						entries={dayEntries}
+						onDelete={handleDeleteDate}
+					/>
+				))}
+			</div>
+		</div>
+	);
 }
